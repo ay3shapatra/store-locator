@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kisna Stores - Find Your Nearest Store</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            background-color: #f5f5f5;
+        }
+
+        .header {
+            background-color: #1f1c28;
+            color: white;
+            padding: 1rem;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .logo {
+            width: 100px;
+            height: 100px;
+            object-fit: contain;
+        }
+
+        .header-text {
+            text-align: left;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .legend {
+            background-color: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin-right: 10px;
+            border: 2px solid white;
+        }
+
+        .red-dot {
+            background-color: #FF0000;
+        }
+
+        .blue-dot {
+            background-color: #4285F4;
+        }
+
+        #map {
+            height: 70vh;
+            width: 100%;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .info-section {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            font-family: Georgia, 'Times New Roman', Times, serif;
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            font-family: Georgia, 'Times New Roman', Times, serif;
+            color: #333;
+        }
+
+        p {
+            line-height: 1.6;
+            color: #666;
+            margin-bottom: 1rem;
+        }
+
+        #status {
+            background-color: #fff;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            display: none;
+        }
+
+        .leaflet-popup-content {
+            padding: 10px;
+        }
+
+        .leaflet-popup-content b {
+            color: #333;
+        }
+
+        #debug {
+            background-color: #f8f9fa;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <img src="kisnalogo.png" alt="Kisna Logo" class="logo">
+        <div class="header-text">
+            <h1>Kisna Diamond & Gold Jewellery</h1>
+            <p>Find Your Nearest Store Location</p>
+        </div>
+    </div>
+
+    <div class="container">
+        <div id="status"></div>
+        <div id="debug"></div>
+        <div class="legend">
+            <h2>Store Locations</h2>
+            <div class="legend-item">
+                <span class="legend-color" style="background-color: #ff0000;"></span>
+                <span>Current Stores</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-color" style="background-color: #0000ff;"></span>
+                <span>Upcoming Stores</span>
+            </div>
+        </div>
+
+        <div id="map"></div>
+
+        <div class="info-section">
+            <h2>About Kisna Stores</h2>
+            <p>Welcome to Kisna Stores, your trusted destination for quality jewelry and accessories. Our stores are conveniently located across India, with new locations opening soon.</p>
+            <p>Click on any marker on the map to see store details and get directions to your nearest location.</p>
+        </div>
+    </div>
+
+    <script>
+        // Initialize map
+        const map = L.map('map').setView([20.5937, 78.9629], 5); // Center on India with appropriate zoom
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Function to validate coordinates
+        function isValidCoordinate(lat, lng) {
+            // India's approximate boundaries
+            const minLat = 6.0;
+            const maxLat = 37.0;
+            const minLng = 68.0;
+            const maxLng = 97.0;
+            
+            const latNum = parseFloat(lat);
+            const lngNum = parseFloat(lng);
+            
+            return !isNaN(latNum) && !isNaN(lngNum) &&
+                   latNum >= minLat && latNum <= maxLat &&
+                   lngNum >= minLng && lngNum <= maxLng;
+        }
+
+        // Function to create a marker
+        function createMarker(lat, lng, name, isUpcoming) {
+            const markerColor = isUpcoming ? '#0000ff' : '#ff0000';
+            const marker = L.circleMarker([lat, lng], {
+                radius: 8,
+                fillColor: markerColor,
+                color: '#fff',
+                weight: 2,
+                opacity: 1,
+                fillOpacity: 0.8
+            });
+
+            marker.bindPopup(`<b>${name}</b>`);
+            return marker;
+        }
+
+        // Function to load store data
+        function loadStoreData(filename, isUpcoming) {
+            fetch(filename)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.text();
+                })
+                .then(data => {
+                    const rows = data.split('\n').slice(1); // Skip header
+                    let markersAdded = 0;
+                    let invalidCoordinates = 0;
+                    
+                    rows.forEach(row => {
+                        if (row.trim()) {
+                            // Split by comma and take only first 3 columns
+                            const columns = row.split(',').slice(0, 3);
+                            const name = columns[0].trim();
+                            const lat = columns[1].trim();
+                            const lng = columns[2].trim();
+                            
+                            if (lat && lng && name) {
+                                if (isValidCoordinate(lat, lng)) {
+                                    const latNum = parseFloat(lat);
+                                    const lngNum = parseFloat(lng);
+                                    const marker = createMarker(latNum, lngNum, name, isUpcoming);
+                                    marker.addTo(map);
+                                    markersAdded++;
+                                } else {
+                                    invalidCoordinates++;
+                                    console.warn(`Invalid coordinates for ${name}: ${lat}, ${lng}`);
+                                }
+                            }
+                        }
+                    });
+                    
+                    console.log(`Added ${markersAdded} ${isUpcoming ? 'upcoming' : 'current'} store markers`);
+                    if (invalidCoordinates > 0) {
+                        console.warn(`Skipped ${invalidCoordinates} stores with invalid coordinates`);
+                    }
+                })
+                .catch(error => {
+                    console.error(`Error loading ${isUpcoming ? 'upcoming' : 'current'} stores:`, error);
+                    document.getElementById('status').style.display = 'block';
+                    document.getElementById('status').textContent = 
+                        `Error loading ${isUpcoming ? 'upcoming' : 'current'} store locations. Please try refreshing the page.`;
+                });
+        }
+
+        // Load both current and upcoming stores
+        loadStoreData('hkstores.csv', false);
+        loadStoreData('upcoming_stores.csv', true);
+    </script>
+</body>
+</html> 

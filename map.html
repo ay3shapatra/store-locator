@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Kisna Stores Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <style>
+        #map {
+            height: 100vh;
+            width: 100%;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <script>
+        // Initialize the map
+        const map = L.map('map').setView([20.5937, 78.9629], 5); // Center on India
+
+        // Add the tile layer (OpenStreetMap)
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Function to create custom icons
+        function createCustomIcon(color) {
+            return L.divIcon({
+                className: 'custom-icon',
+                html: `<div style="background-color: ${color}; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white;"></div>`,
+                iconSize: [16, 16]
+            });
+        }
+
+        // Load current stores
+        fetch('hkstores.csv')
+            .then(response => response.text())
+            .then(data => {
+                const rows = data.split('\n').slice(1); // Skip header
+                rows.forEach(row => {
+                    if (row.trim()) {
+                        const [name, lat, lng] = row.split(',');
+                        if (lat && lng) {
+                            L.marker([lat, lng], {
+                                icon: createCustomIcon('red')
+                            })
+                            .bindPopup(`<b>${name}</b><br>Current Store`)
+                            .addTo(map);
+                        }
+                    }
+                });
+            });
+
+        // Load upcoming stores
+        fetch('upcoming_stores.csv')
+            .then(response => response.text())
+            .then(data => {
+                const rows = data.split('\n').slice(1); // Skip header
+                rows.forEach(row => {
+                    if (row.trim()) {
+                        const [name, lat, lng] = row.split(',');
+                        if (lat && lng) {
+                            L.marker([lat, lng], {
+                                icon: createCustomIcon('blue')
+                            })
+                            .bindPopup(`<b>${name}</b><br>Upcoming Store`)
+                            .addTo(map);
+                        }
+                    }
+                });
+            });
+    </script>
+</body>
+</html> 
